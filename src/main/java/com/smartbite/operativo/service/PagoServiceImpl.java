@@ -3,6 +3,7 @@ package com.smartbite.operativo.service;
 import com.smartbite.operativo.dto.pago.CrearPagoRequestDTO;
 import com.smartbite.operativo.dto.pago.PagoResponseDTO;
 import com.smartbite.operativo.exception.BusinessException;
+import com.smartbite.operativo.exception.OrdenNotFoundException;
 import com.smartbite.operativo.exception.ResourceNotFoundException;
 import com.smartbite.operativo.mapper.PagoMapper;
 import com.smartbite.operativo.model.MetodoPago;
@@ -36,12 +37,30 @@ public class PagoServiceImpl implements PagoService {
     @Transactional
     public PagoResponseDTO registrarPago(CrearPagoRequestDTO request) {
         Orden orden = ordenRepository.findById(request.getOrdenId())
-                .orElseThrow(() -> new ResourceNotFoundException(
+                .orElseThrow(() -> new OrdenNotFoundException(
                         "Orden no encontrada con id: " + request.getOrdenId()));
 
         if (orden.getEstado() == EstadoOrden.CANCELADA) {
             throw new BusinessException(
                     "No se puede registrar un pago para una orden cancelada");
+        }
+
+        if (orden.getEstado() == EstadoOrden.PAGADA) {
+            throw new BusinessException(
+                    "No se puede registrar un pago para una orden ya pagada");
+        }
+
+        if (request.getMonto() == null || request.getMonto().compareTo(BigDecimal.ZERO) <= 0) {
+            throw new BusinessException("El monto del pago debe ser mayor a 0");
+        }
+
+        BigDecimal totalPagado = calcularTotalPagado(request.getOrdenId());
+        BigDecimal totalOrden = orden.getTotal() == null ? BigDecimal.ZERO : orden.getTotal();
+        BigDecimal saldoPendiente = totalOrden.subtract(totalPagado);
+
+        if (request.getMonto().compareTo(saldoPendiente) > 0) {
+            throw new BusinessException(
+                    "El monto del pago excede el saldo pendiente de la orden");
         }
 
         MetodoPago metodoPago = metodoPagoRepository.findById(request.getMetodoPagoId())
@@ -51,7 +70,7 @@ public class PagoServiceImpl implements PagoService {
         Pago pago = Pago.builder()
                 .monto(request.getMonto())
                 .fechaPago(LocalDateTime.now())
-                .estado(EstadoPago.PENDIENTE)
+                .estado(EstadoPago.APROBADO)
                 .referenciaTransaccion(request.getReferenciaTransaccion())
                 .orden(orden)
                 .metodoPago(metodoPago)
@@ -65,7 +84,7 @@ public class PagoServiceImpl implements PagoService {
     @Transactional(readOnly = true)
     public List<PagoResponseDTO> obtenerPagosPorOrden(Long ordenId) {
         if (!ordenRepository.existsById(ordenId)) {
-            throw new ResourceNotFoundException("Orden no encontrada con id: " + ordenId);
+            throw new OrdenNotFoundException("Orden no encontrada con id: " + ordenId);
         }
 
         return pagoRepository.findByOrdenId(ordenId)
@@ -78,7 +97,7 @@ public class PagoServiceImpl implements PagoService {
     @Transactional(readOnly = true)
     public BigDecimal calcularTotalPagado(Long ordenId) {
         if (!ordenRepository.existsById(ordenId)) {
-            throw new ResourceNotFoundException("Orden no encontrada con id: " + ordenId);
+            throw new OrdenNotFoundException("Orden no encontrada con id: " + ordenId);
         }
 
         return pagoRepository.findByOrdenIdAndEstado(ordenId, EstadoPago.APROBADO)
@@ -91,10 +110,11 @@ public class PagoServiceImpl implements PagoService {
     @Transactional(readOnly = true)
     public boolean estaOrdenTotalmentePagada(Long ordenId) {
         Orden orden = ordenRepository.findById(ordenId)
-                .orElseThrow(() -> new ResourceNotFoundException(
+                .orElseThrow(() -> new OrdenNotFoundException(
                         "Orden no encontrada con id: " + ordenId));
 
+        BigDecimal totalOrden = orden.getTotal() == null ? BigDecimal.ZERO : orden.getTotal();
         BigDecimal totalPagado = calcularTotalPagado(ordenId);
-        return totalPagado.compareTo(orden.getTotal()) >= 0;
+        return totalPagado.compareTo(totalOrden) >= 0;
     }
 }

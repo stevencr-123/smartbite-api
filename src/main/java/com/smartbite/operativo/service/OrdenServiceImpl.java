@@ -5,8 +5,11 @@ import com.smartbite.operativo.dto.detalle.DetalleOrdenResponseDTO;
 import com.smartbite.operativo.dto.orden.CrearOrdenRequestDTO;
 import com.smartbite.operativo.dto.orden.OrdenResumenDTO;
 import com.smartbite.operativo.dto.orden.OrdenResponseDTO;
+import com.smartbite.operativo.exception.EstadoOrdenInvalidoException;
 import com.smartbite.operativo.exception.InvalidStateException;
-import com.smartbite.operativo.exception.ResourceNotFoundException;
+import com.smartbite.operativo.exception.MesaNotFoundException;
+import com.smartbite.operativo.exception.OrdenNoPagadaException;
+import com.smartbite.operativo.exception.OrdenNotFoundException;
 import com.smartbite.operativo.mapper.DetalleOrdenMapper;
 import com.smartbite.operativo.mapper.OrdenMapper;
 import com.smartbite.operativo.model.DetalleOrden;
@@ -36,12 +39,13 @@ public class OrdenServiceImpl implements OrdenService {
     private final MesaRepository mesaRepository;
     private final OrdenMapper ordenMapper;
     private final DetalleOrdenMapper detalleOrdenMapper;
+    private final PagoService pagoService;
 
     @Override
     @Transactional
     public OrdenResponseDTO crearOrden(CrearOrdenRequestDTO request) {
         Mesa mesa = mesaRepository.findById(request.getMesaId())
-                .orElseThrow(() -> new ResourceNotFoundException(
+                .orElseThrow(() -> new MesaNotFoundException(
                         "Mesa no encontrada con id: " + request.getMesaId()));
 
         Orden orden = Orden.builder()
@@ -79,12 +83,16 @@ public class OrdenServiceImpl implements OrdenService {
     @Transactional
     public DetalleOrdenResponseDTO agregarProducto(Long ordenId, AgregarProductoRequestDTO request) {
         Orden orden = ordenRepository.findById(ordenId)
-                .orElseThrow(() -> new ResourceNotFoundException(
+                .orElseThrow(() -> new OrdenNotFoundException(
                         "Orden no encontrada con id: " + ordenId));
 
         if (orden.getEstado() == EstadoOrden.CANCELADA || orden.getEstado() == EstadoOrden.PAGADA) {
             throw new InvalidStateException(
                     "No se pueden agregar productos a una orden en estado: " + orden.getEstado());
+        }
+
+        if (request.getCantidad() == null || request.getCantidad() <= 0) {
+            throw new InvalidStateException("La cantidad debe ser mayor a 0");
         }
 
         DetalleOrden detalle = DetalleOrden.builder()
@@ -95,6 +103,9 @@ public class OrdenServiceImpl implements OrdenService {
                 .orden(orden)
                 .build();
 
+        // Keep entity graph consistent
+        orden.getDetalles().add(detalle);
+
         DetalleOrden detalleGuardado = detalleOrdenRepository.save(detalle);
         return detalleOrdenMapper.toResponseDTO(detalleGuardado);
     }
@@ -103,7 +114,7 @@ public class OrdenServiceImpl implements OrdenService {
     @Transactional(readOnly = true)
     public OrdenResponseDTO obtenerOrdenPorId(Long ordenId) {
         Orden orden = ordenRepository.findById(ordenId)
-                .orElseThrow(() -> new ResourceNotFoundException(
+                .orElseThrow(() -> new OrdenNotFoundException(
                         "Orden no encontrada con id: " + ordenId));
         return ordenMapper.toResponseDTO(orden);
     }
@@ -128,7 +139,7 @@ public class OrdenServiceImpl implements OrdenService {
     @Transactional
     public OrdenResponseDTO recalcularTotal(Long ordenId) {
         Orden orden = ordenRepository.findById(ordenId)
-                .orElseThrow(() -> new ResourceNotFoundException(
+                .orElseThrow(() -> new OrdenNotFoundException(
                         "Orden no encontrada con id: " + ordenId));
 
         BigDecimal nuevoTotal = orden.getDetalles()
@@ -143,19 +154,23 @@ public class OrdenServiceImpl implements OrdenService {
 
     @Override
     @Transactional
-    public OrdenResponseDTO cambiarEstado(Long ordenId, String nuevoEstado) {
+    public OrdenResponseDTO cambiarEstado(Long ordenId, EstadoOrden nuevoEstado) {
         Orden orden = ordenRepository.findById(ordenId)
-                .orElseThrow(() -> new ResourceNotFoundException(
+                .orElseThrow(() -> new OrdenNotFoundException(
                         "Orden no encontrada con id: " + ordenId));
 
-        EstadoOrden estado;
-        try {
-            estado = EstadoOrden.valueOf(nuevoEstado.toUpperCase());
-        } catch (IllegalArgumentException e) {
-            throw new InvalidStateException("Estado de orden inválido: " + nuevoEstado);
+        EstadoOrden estadoActual = orden.getEstado();
+        if (!esTransicionValida(estadoActual, nuevoEstado)) {
+            throw new EstadoOrdenInvalidoException(
+                    "Transición de estado inválida: " + estadoActual + " -> " + nuevoEstado);
         }
 
-        orden.setEstado(estado);
+        if (nuevoEstado == EstadoOrden.PAGADA && !pagoService.estaOrdenTotalmentePagada(ordenId)) {
+            throw new OrdenNoPagadaException(
+                    "No se puede marcar como PAGADA una orden que no está totalmente pagada");
+        }
+
+        orden.setEstado(nuevoEstado);
         Orden ordenActualizada = ordenRepository.save(orden);
         return ordenMapper.toResponseDTO(ordenActualizada);
     }
@@ -163,23 +178,35 @@ public class OrdenServiceImpl implements OrdenService {
     @Override
     @Transactional
     public OrdenResponseDTO cerrarOrden(Long ordenId) {
+        // Delegate to the same transition validation + payment validation
+        OrdenResponseDTO ordenCerrada = cambiarEstado(ordenId, EstadoOrden.PAGADA);
+
+        // Release the table (defensive)
         Orden orden = ordenRepository.findById(ordenId)
-                .orElseThrow(() -> new ResourceNotFoundException(
+                .orElseThrow(() -> new OrdenNotFoundException(
                         "Orden no encontrada con id: " + ordenId));
 
-        if (orden.getEstado() == EstadoOrden.CANCELADA || orden.getEstado() == EstadoOrden.PAGADA) {
-            throw new InvalidStateException(
-                    "La orden ya se encuentra en estado: " + orden.getEstado());
+        Mesa mesa = orden.getMesa();
+        if (mesa != null) {
+            mesa.setEstado(EstadoMesa.DISPONIBLE);
+            mesaRepository.save(mesa);
         }
 
-        orden.setEstado(EstadoOrden.PAGADA);
-        Orden ordenCerrada = ordenRepository.save(orden);
-
-        // Release the table
-        Mesa mesa = orden.getMesa();
-        mesa.setEstado(EstadoMesa.DISPONIBLE);
-        mesaRepository.save(mesa);
-
-        return ordenMapper.toResponseDTO(ordenCerrada);
+        return ordenCerrada;
     }
+
+    private boolean esTransicionValida(EstadoOrden actual, EstadoOrden nuevo) {
+        if (actual == null || nuevo == null) {
+            return false;
+        }
+
+        return switch (actual) {
+            case PENDIENTE -> nuevo == EstadoOrden.EN_PREPARACION;
+            case EN_PREPARACION -> nuevo == EstadoOrden.LISTA;
+            case LISTA -> nuevo == EstadoOrden.ENTREGADA;
+            case ENTREGADA -> nuevo == EstadoOrden.PAGADA;
+            case PAGADA, CANCELADA -> false;
+        };
+    }
+
 }

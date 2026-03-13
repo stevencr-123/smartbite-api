@@ -5,6 +5,7 @@ import com.smartbite.operativo.dto.detalle.DetalleOrdenResponseDTO;
 import com.smartbite.operativo.dto.orden.CrearOrdenRequestDTO;
 import com.smartbite.operativo.dto.orden.OrdenResumenDTO;
 import com.smartbite.operativo.dto.orden.OrdenResponseDTO;
+import com.smartbite.operativo.model.enums.EstadoOrden;
 
 import java.util.List;
 
@@ -20,8 +21,7 @@ public interface OrdenService {
 
     OrdenResponseDTO recalcularTotal(Long ordenId);
 
-    OrdenResponseDTO cambiarEstado(Long ordenId, String nuevoEstado);
+    OrdenResponseDTO cambiarEstado(Long ordenId, EstadoOrden nuevoEstado);
 
     OrdenResponseDTO cerrarOrden(Long ordenId);
 }
-
