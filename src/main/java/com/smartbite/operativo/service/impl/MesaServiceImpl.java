@@ -1,4 +1,4 @@
-package com.smartbite.operativo.service;
+package com.smartbite.operativo.service.impl;
 
 import com.smartbite.operativo.dto.mesa.ActualizarEstadoMesaRequestDTO;
 import com.smartbite.operativo.dto.mesa.MesaResponseDTO;
@@ -6,6 +6,7 @@ import com.smartbite.operativo.exception.ResourceNotFoundException;
 import com.smartbite.operativo.mapper.MesaMapper;
 import com.smartbite.operativo.model.Mesa;
 import com.smartbite.operativo.repository.MesaRepository;
+import com.smartbite.operativo.service.MesaService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -57,3 +58,4 @@ public class MesaServiceImpl implements MesaService {
         return mesaMapper.toResponseDTO(mesaActualizada);
     }
 }
+

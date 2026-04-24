@@ -1,4 +1,4 @@
-package com.smartbite.operativo.service;
+package com.smartbite.operativo.service.impl;
 
 import com.smartbite.operativo.dto.detalle.AgregarProductoRequestDTO;
 import com.smartbite.operativo.dto.detalle.DetalleOrdenResponseDTO;
@@ -20,6 +20,8 @@ import com.smartbite.operativo.model.enums.EstadoOrden;
 import com.smartbite.operativo.repository.DetalleOrdenRepository;
 import com.smartbite.operativo.repository.MesaRepository;
 import com.smartbite.operativo.repository.OrdenRepository;
+import com.smartbite.operativo.service.OrdenService;
+import com.smartbite.operativo.service.PagoService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -34,12 +36,14 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class OrdenServiceImpl implements OrdenService {
 
+    private static final BigDecimal PRECIO_UNITARIO_TEMPORAL = new BigDecimal("10000");
+
     private final OrdenRepository ordenRepository;
     private final DetalleOrdenRepository detalleOrdenRepository;
     private final MesaRepository mesaRepository;
+    private final PagoService pagoService;
     private final OrdenMapper ordenMapper;
     private final DetalleOrdenMapper detalleOrdenMapper;
-    private final PagoService pagoService;
 
     @Override
     @Transactional
@@ -57,19 +61,19 @@ public class OrdenServiceImpl implements OrdenService {
                 .usuarioId(request.getUsuarioId())
                 .build();
 
-        // Add initial products if provided
+        // Add initial products with snapshot pricing.
         if (request.getProductos() != null && !request.getProductos().isEmpty()) {
             for (AgregarProductoRequestDTO producto : request.getProductos()) {
-                DetalleOrden detalle = DetalleOrden.builder()
-                        .productoId(producto.getProductoId())
-                        .cantidad(producto.getCantidad())
-                        .precioUnitario(BigDecimal.ZERO) // Price will be set by administrativo module
-                        .subtotal(BigDecimal.ZERO)
-                        .orden(orden)
-                        .build();
+                DetalleOrden detalle = crearDetalleConPrecioSnapshot(orden, producto);
                 orden.getDetalles().add(detalle);
             }
         }
+
+        BigDecimal total = orden.getDetalles()
+                .stream()
+                .map(detalle -> Objects.requireNonNullElse(detalle.getSubtotal(), BigDecimal.ZERO))
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        orden.setTotal(total);
 
         // Mark table as occupied
         mesa.setEstado(EstadoMesa.OCUPADA);
@@ -91,22 +95,17 @@ public class OrdenServiceImpl implements OrdenService {
                     "No se pueden agregar productos a una orden en estado: " + orden.getEstado());
         }
 
-        if (request.getCantidad() == null || request.getCantidad() <= 0) {
-            throw new InvalidStateException("La cantidad debe ser mayor a 0");
-        }
-
-        DetalleOrden detalle = DetalleOrden.builder()
-                .productoId(request.getProductoId())
-                .cantidad(request.getCantidad())
-                .precioUnitario(BigDecimal.ZERO)
-                .subtotal(BigDecimal.ZERO)
-                .orden(orden)
-                .build();
+        DetalleOrden detalle = crearDetalleConPrecioSnapshot(orden, request);
 
         // Keep entity graph consistent
         orden.getDetalles().add(detalle);
 
         DetalleOrden detalleGuardado = detalleOrdenRepository.save(detalle);
+        BigDecimal nuevoTotal = orden.getDetalles().stream()
+                .map(item -> Objects.requireNonNullElse(item.getSubtotal(), BigDecimal.ZERO))
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        orden.setTotal(nuevoTotal);
+        ordenRepository.save(orden);
         return detalleOrdenMapper.toResponseDTO(detalleGuardado);
     }
 
@@ -209,4 +208,31 @@ public class OrdenServiceImpl implements OrdenService {
         };
     }
 
+    private DetalleOrden crearDetalleConPrecioSnapshot(Orden orden, AgregarProductoRequestDTO request) {
+        if (request.getProductoId() == null) {
+            throw new InvalidStateException("El productoId es obligatorio");
+        }
+        if (request.getCantidad() == null || request.getCantidad() <= 0) {
+            throw new InvalidStateException("La cantidad debe ser mayor a 0");
+        }
+
+        // TODO: integrar con módulo administrativo para obtener precio real
+        BigDecimal precioUnitario = PRECIO_UNITARIO_TEMPORAL;
+        if (precioUnitario.compareTo(BigDecimal.ZERO) <= 0) {
+            throw new InvalidStateException("El precioUnitario debe ser mayor a 0");
+        }
+
+        BigDecimal subtotal = precioUnitario.multiply(BigDecimal.valueOf(request.getCantidad()));
+
+        return DetalleOrden.builder()
+                .productoId(request.getProductoId())
+                .cantidad(request.getCantidad())
+                .precioUnitario(precioUnitario)
+                .subtotal(subtotal)
+                .orden(orden)
+                .build();
+    }
+
+
 }
+

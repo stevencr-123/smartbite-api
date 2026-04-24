@@ -1,4 +1,4 @@
-package com.smartbite.operativo.service;
+package com.smartbite.operativo.service.impl;
 
 import com.smartbite.operativo.dto.pago.CrearPagoRequestDTO;
 import com.smartbite.operativo.dto.pago.PagoResponseDTO;
@@ -14,6 +14,7 @@ import com.smartbite.operativo.model.enums.EstadoPago;
 import com.smartbite.operativo.repository.MetodoPagoRepository;
 import com.smartbite.operativo.repository.OrdenRepository;
 import com.smartbite.operativo.repository.PagoRepository;
+import com.smartbite.operativo.service.PagoService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -36,6 +37,11 @@ public class PagoServiceImpl implements PagoService {
     @Override
     @Transactional
     public PagoResponseDTO registrarPago(CrearPagoRequestDTO request) {
+
+        if (request.getOrdenId() == null) {
+            throw new BusinessException("ordenId es obligatorio");
+        }
+
         Orden orden = ordenRepository.findById(request.getOrdenId())
                 .orElseThrow(() -> new OrdenNotFoundException(
                         "Orden no encontrada con id: " + request.getOrdenId()));
@@ -45,9 +51,10 @@ public class PagoServiceImpl implements PagoService {
                     "No se puede registrar un pago para una orden cancelada");
         }
 
-        if (orden.getEstado() == EstadoOrden.PAGADA) {
+        // 🔹 Fuente única de verdad (NO usar estado directamente)
+        if (estaOrdenTotalmentePagada(request.getOrdenId())) {
             throw new BusinessException(
-                    "No se puede registrar un pago para una orden ya pagada");
+                    "La orden ya está totalmente pagada");
         }
 
         if (request.getMonto() == null || request.getMonto().compareTo(BigDecimal.ZERO) <= 0) {
@@ -77,6 +84,14 @@ public class PagoServiceImpl implements PagoService {
                 .build();
 
         Pago pagoGuardado = pagoRepository.save(pago);
+
+        BigDecimal totalPagadoActualizado = totalPagado.add(request.getMonto());
+
+        if (totalPagadoActualizado.compareTo(totalOrden) == 0) {
+            orden.setEstado(EstadoOrden.PAGADA);
+            ordenRepository.save(orden);
+        }
+
         return pagoMapper.toResponseDTO(pagoGuardado);
     }
 
@@ -115,6 +130,7 @@ public class PagoServiceImpl implements PagoService {
 
         BigDecimal totalOrden = orden.getTotal() == null ? BigDecimal.ZERO : orden.getTotal();
         BigDecimal totalPagado = calcularTotalPagado(ordenId);
-        return totalPagado.compareTo(totalOrden) >= 0;
+
+        return totalPagado.compareTo(totalOrden) == 0;
     }
 }

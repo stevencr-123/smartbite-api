@@ -8,12 +8,15 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 @Entity
-@Table(name = "pagos")
 @Getter
 @Setter
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
+@Table(name = "pagos", indexes = {
+        @Index(name = "idx_pago_orden", columnList = "orden_id")
+})
+
 public class Pago {
 
     @Id
@@ -30,7 +33,7 @@ public class Pago {
     @Column(nullable = false)
     private EstadoPago estado;
 
-    @Column(name = "referencia_transaccion")
+    @Column(name = "referencia_transaccion", length = 100)
     private String referenciaTransaccion;
 
     // --- Internal JPA relationships (Operativo module) ---
@@ -42,4 +45,6 @@ public class Pago {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "metodo_pago_id", nullable = false)
     private MetodoPago metodoPago;
+
+
 }

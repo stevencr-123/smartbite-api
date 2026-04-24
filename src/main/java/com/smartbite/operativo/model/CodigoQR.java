@@ -19,7 +19,7 @@ public class CodigoQR {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(nullable = false)
+    @Column(nullable = false, length = 255)
     private String contenido;
 
     @Enumerated(EnumType.STRING)
@@ -35,12 +35,15 @@ public class CodigoQR {
 
     // --- Internal JPA relationship (Operativo module) ---
 
-    @OneToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "mesa_id", unique = true)
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "mesa_id")
     private Mesa mesa;
 
     // --- Cross-module reference (Administrativo) ---
 
     @Column(name = "producto_id")
     private Long productoId;
+
+    @Column(name = "orden_id")
+    private Long ordenId;
 }

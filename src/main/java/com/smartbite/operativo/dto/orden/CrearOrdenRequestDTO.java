@@ -1,6 +1,8 @@
 package com.smartbite.operativo.dto.orden;
 
 import com.smartbite.operativo.dto.detalle.AgregarProductoRequestDTO;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Size;
 import lombok.*;
 
 import java.util.List;
@@ -12,9 +14,15 @@ import java.util.List;
 @Builder
 public class CrearOrdenRequestDTO {
 
+    @NotNull
     private Long mesaId;
+
+    @NotNull
     private Long usuarioId;
+
+    @NotNull
     private Long sucursalId;
+    @NotNull
+    @Size(min = 1)
     private List<AgregarProductoRequestDTO> productos;
 }
-

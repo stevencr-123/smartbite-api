@@ -18,14 +18,14 @@ public class MetodoPago {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(nullable = false, unique = true)
+    @Column(nullable = false, unique = true, length = 50)
     private String nombre;
 
     @Column(nullable = false)
     @Builder.Default
     private Boolean activo = true;
 
-    @Column(precision = 10, scale = 2)
+    @Column(precision = 10, scale = 2, nullable = false)
     @Builder.Default
     private BigDecimal comision = BigDecimal.ZERO;
 }

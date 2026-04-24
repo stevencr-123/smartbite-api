@@ -6,5 +6,9 @@ public enum EstadoOrden {
     LISTA,
     ENTREGADA,
     CANCELADA,
-    PAGADA
+    PAGADA;
+
+    public boolean esFinal() {
+        return this == PAGADA || this == CANCELADA;
+    }
 }

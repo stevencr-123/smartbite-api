@@ -9,9 +9,8 @@ import lombok.*;
 @AllArgsConstructor
 @Builder
 public class MesaResponseDTO {
-
     private Long id;
-    private Integer numero;
+    private String numero;
     private Integer capacidad;
     private EstadoMesa estado;
     private Boolean activa;

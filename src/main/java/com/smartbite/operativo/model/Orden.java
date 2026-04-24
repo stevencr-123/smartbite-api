@@ -1,6 +1,7 @@
 package com.smartbite.operativo.model;
 
 import com.smartbite.operativo.model.enums.EstadoOrden;
+import com.smartbite.operativo.model.Venta;
 import jakarta.persistence.*;
 import lombok.*;
 
@@ -47,6 +48,9 @@ public class Orden {
     @Builder.Default
     private List<Pago> pagos = new ArrayList<>();
 
+    @OneToOne(mappedBy = "orden")
+    private Venta venta;
+
     // --- Cross-module references (Administrativo) ---
 
     @Column(name = "sucursal_id", nullable = false)
@@ -54,4 +58,24 @@ public class Orden {
 
     @Column(name = "usuario_id", nullable = false)
     private Long usuarioId;
+
+    public void addDetalle(DetalleOrden detalle) {
+        detalles.add(detalle);
+        detalle.setOrden(this);
+    }
+
+    public void removeDetalle(DetalleOrden detalle) {
+        detalles.remove(detalle);
+        detalle.setOrden(null);
+    }
+
+    public void addPago(Pago pago) {
+        pagos.add(pago);
+        pago.setOrden(this);
+    }
+
+    public void removePago(Pago pago) {
+        pagos.remove(pago);
+        pago.setOrden(null);
+    }
 }
