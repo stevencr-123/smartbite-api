@@ -1,4 +1,4 @@
-package com.smartbite.administrativo.model.enums;
+package com.smartbite.administrativo.enums;
 
 public enum TipoMovimientoInventario {
     ENTRADA,
