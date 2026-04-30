@@ -27,3 +27,7 @@ server:
 logging:
   level:
     org.hibernate.SQL: debug
+
+admin:
+  service:
+    url: http://localhost:8081

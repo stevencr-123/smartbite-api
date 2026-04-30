@@ -1,10 +1,12 @@
 package com.smartbite.operativo.service.impl;
-
+import com.smartbite.operativo.client.ProductoClient;
+import com.smartbite.operativo.client.dto.ProductoDTO;
 import com.smartbite.operativo.dto.detalle.AgregarProductoRequestDTO;
 import com.smartbite.operativo.dto.detalle.DetalleOrdenResponseDTO;
 import com.smartbite.operativo.dto.orden.CrearOrdenRequestDTO;
 import com.smartbite.operativo.dto.orden.OrdenResumenDTO;
 import com.smartbite.operativo.dto.orden.OrdenResponseDTO;
+import com.smartbite.operativo.exception.BusinessException;
 import com.smartbite.operativo.exception.EstadoOrdenInvalidoException;
 import com.smartbite.operativo.exception.InvalidStateException;
 import com.smartbite.operativo.exception.MesaNotFoundException;
@@ -36,11 +38,10 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class OrdenServiceImpl implements OrdenService {
 
-    private static final BigDecimal PRECIO_UNITARIO_TEMPORAL = new BigDecimal("10000");
-
     private final OrdenRepository ordenRepository;
     private final DetalleOrdenRepository detalleOrdenRepository;
     private final MesaRepository mesaRepository;
+    private final ProductoClient productoClient;
     private final PagoService pagoService;
     private final OrdenMapper ordenMapper;
     private final DetalleOrdenMapper detalleOrdenMapper;
@@ -216,8 +217,7 @@ public class OrdenServiceImpl implements OrdenService {
             throw new InvalidStateException("La cantidad debe ser mayor a 0");
         }
 
-        // TODO: integrar con módulo administrativo para obtener precio real
-        BigDecimal precioUnitario = PRECIO_UNITARIO_TEMPORAL;
+        BigDecimal precioUnitario = obtenerPrecioProducto(request.getProductoId());
         if (precioUnitario.compareTo(BigDecimal.ZERO) <= 0) {
             throw new InvalidStateException("El precioUnitario debe ser mayor a 0");
         }
@@ -231,6 +231,29 @@ public class OrdenServiceImpl implements OrdenService {
                 .subtotal(subtotal)
                 .orden(orden)
                 .build();
+    }
+
+    private BigDecimal obtenerPrecioProducto(Long productoId) {
+        ProductoDTO producto;
+        try {
+            producto = productoClient.obtenerProductoPorId(productoId);
+        } catch (Exception ex) {
+            throw new BusinessException("No se pudo obtener el producto desde Administrativo");
+        }
+
+        if (producto == null) {
+            throw new InvalidStateException("Producto no encontrado con id: " + productoId);
+        }
+        if (producto.getActivo() == null || !producto.getActivo()) {
+            throw new InvalidStateException("El producto no está activo con id: " + productoId);
+        }
+
+        BigDecimal precio = producto.getPrecio();
+        if (precio == null || precio.compareTo(BigDecimal.ZERO) <= 0) {
+            throw new InvalidStateException("Precio inválido para el producto id: " + productoId);
+        }
+
+        return precio;
     }
 
 
