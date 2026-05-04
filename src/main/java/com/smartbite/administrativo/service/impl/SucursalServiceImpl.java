@@ -4,6 +4,7 @@ import com.smartbite.administrativo.dto.SucursalRequestDTO;
 import com.smartbite.administrativo.dto.SucursalResponseDTO;
 import com.smartbite.administrativo.exception.BusinessException;
 import com.smartbite.administrativo.exception.ResourceNotFoundException;
+import com.smartbite.administrativo.mapper.SucursalMapper;
 import com.smartbite.administrativo.model.Restaurante;
 import com.smartbite.administrativo.model.Sucursal;
 import com.smartbite.administrativo.repository.RestauranteRepository;
@@ -25,39 +26,37 @@ public class SucursalServiceImpl implements SucursalService {
 
     private final SucursalRepository sucursalRepository;
     private final RestauranteRepository restauranteRepository;
+    private final SucursalMapper sucursalMapper;
 
     @Override
     public SucursalResponseDTO crearSucursal(SucursalRequestDTO requestDTO) {
         log.info("Creando sucursal: {} para restaurante ID: {}",
                 requestDTO.getNombre(), requestDTO.getRestauranteId());
 
+        // Validar que el restaurante existe
         Restaurante restaurante = restauranteRepository.findById(requestDTO.getRestauranteId())
                 .orElseThrow(() -> new ResourceNotFoundException("Restaurante no encontrado con ID: " + requestDTO.getRestauranteId()));
 
+        // Validar nombre único dentro del restaurante
         if (sucursalRepository.existsByNombreAndRestauranteId(requestDTO.getNombre(), requestDTO.getRestauranteId())) {
             throw new BusinessException("Ya existe una sucursal con el nombre '" + requestDTO.getNombre() + "' en este restaurante");
         }
 
+        // Validar email único
         if (requestDTO.getEmail() != null && sucursalRepository.findByEmail(requestDTO.getEmail()).isPresent()) {
             throw new BusinessException("Ya existe una sucursal con el email: " + requestDTO.getEmail());
         }
 
-        // Conversión manual de RequestDTO a Entity
-        Sucursal sucursal = new Sucursal();
-        sucursal.setNombre(requestDTO.getNombre());
-        sucursal.setDireccion(requestDTO.getDireccion());
-        sucursal.setTelefono(requestDTO.getTelefono());
-        sucursal.setTelefonoSecundario(requestDTO.getTelefonoSecundario());
-        sucursal.setEmail(requestDTO.getEmail());
-        sucursal.setHorarioAtencion(requestDTO.getHorarioAtencion());
+        // Convertir DTO a Entity (sin la relación)
+        Sucursal sucursal = sucursalMapper.toEntity(requestDTO);
+
+        // Asignar la relación manualmente
         sucursal.setRestaurante(restaurante);
 
         Sucursal guardado = sucursalRepository.save(sucursal);
-
         log.info("Sucursal creada con ID: {}", guardado.getId());
 
-        // Conversión manual de Entity a ResponseDTO
-        return convertToResponseDTO(guardado);
+        return sucursalMapper.toResponseDTO(guardado);
     }
 
     @Override
@@ -67,11 +66,12 @@ public class SucursalServiceImpl implements SucursalService {
         Sucursal sucursal = sucursalRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Sucursal no encontrada con ID: " + id));
 
+        // Validar email único excluyendo la propia sucursal
         if (requestDTO.getEmail() != null && sucursalRepository.existsByEmailAndIdNot(requestDTO.getEmail(), id)) {
             throw new BusinessException("Ya existe otra sucursal con el email: " + requestDTO.getEmail());
         }
 
-        // Actualizar campos manualmente
+        // Actualizar campos básicos (usando mapper pero sin tocar relaciones)
         sucursal.setNombre(requestDTO.getNombre());
         sucursal.setDireccion(requestDTO.getDireccion());
         sucursal.setTelefono(requestDTO.getTelefono());
@@ -79,7 +79,7 @@ public class SucursalServiceImpl implements SucursalService {
         sucursal.setEmail(requestDTO.getEmail());
         sucursal.setHorarioAtencion(requestDTO.getHorarioAtencion());
 
-        // Si cambia el restaurante
+        // Actualizar restaurante si cambia (relación manual)
         if (!sucursal.getRestaurante().getId().equals(requestDTO.getRestauranteId())) {
             Restaurante nuevoRestaurante = restauranteRepository.findById(requestDTO.getRestauranteId())
                     .orElseThrow(() -> new ResourceNotFoundException("Restaurante no encontrado con ID: " + requestDTO.getRestauranteId()));
@@ -89,7 +89,7 @@ public class SucursalServiceImpl implements SucursalService {
         Sucursal actualizado = sucursalRepository.save(sucursal);
         log.info("Sucursal actualizada con ID: {}", actualizado.getId());
 
-        return convertToResponseDTO(actualizado);
+        return sucursalMapper.toResponseDTO(actualizado);
     }
 
     @Override
@@ -100,7 +100,7 @@ public class SucursalServiceImpl implements SucursalService {
         Sucursal sucursal = sucursalRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Sucursal no encontrada con ID: " + id));
 
-        return convertToResponseDTO(sucursal);
+        return sucursalMapper.toResponseDTO(sucursal);
     }
 
     @Override
@@ -109,7 +109,7 @@ public class SucursalServiceImpl implements SucursalService {
         log.debug("Obteniendo sucursales del restaurante ID: {}", restauranteId);
 
         return sucursalRepository.findByRestauranteId(restauranteId).stream()
-                .map(this::convertToResponseDTO)
+                .map(sucursalMapper::toResponseDTO)
                 .collect(Collectors.toList());
     }
 
@@ -119,7 +119,7 @@ public class SucursalServiceImpl implements SucursalService {
         log.debug("Obteniendo todas las sucursales");
 
         return sucursalRepository.findAll().stream()
-                .map(this::convertToResponseDTO)
+                .map(sucursalMapper::toResponseDTO)
                 .collect(Collectors.toList());
     }
 
@@ -145,28 +145,6 @@ public class SucursalServiceImpl implements SucursalService {
         sucursal.setActivo(activo);
         Sucursal actualizado = sucursalRepository.save(sucursal);
 
-        return convertToResponseDTO(actualizado);
-    }
-
-    // Método privado para convertir Entity a ResponseDTO
-    private SucursalResponseDTO convertToResponseDTO(Sucursal sucursal) {
-        SucursalResponseDTO responseDTO = new SucursalResponseDTO();
-        responseDTO.setId(sucursal.getId());
-        responseDTO.setNombre(sucursal.getNombre());
-        responseDTO.setDireccion(sucursal.getDireccion());
-        responseDTO.setTelefono(sucursal.getTelefono());
-        responseDTO.setTelefonoSecundario(sucursal.getTelefonoSecundario());
-        responseDTO.setEmail(sucursal.getEmail());
-        responseDTO.setHorarioAtencion(sucursal.getHorarioAtencion());
-        responseDTO.setActivo(sucursal.getActivo());
-        responseDTO.setFechaCreacion(sucursal.getFechaCreacion());
-        responseDTO.setFechaActualizacion(sucursal.getFechaActualizacion());
-
-        if (sucursal.getRestaurante() != null) {
-            responseDTO.setRestauranteId(sucursal.getRestaurante().getId());
-            responseDTO.setRestauranteNombre(sucursal.getRestaurante().getNombre());
-        }
-
-        return responseDTO;
+        return sucursalMapper.toResponseDTO(actualizado);
     }
 }
