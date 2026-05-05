@@ -20,5 +20,4 @@ public class UsuarioResponseDTO {
     private String sucursalNombre;
     private Long rolId;
     private String rolNombre;
-
 }

@@ -1,5 +1,6 @@
 package com.smartbite.administrativo.dto;
 
+import com.smartbite.administrativo.enums.RolNombre;
 import jakarta.validation.constraints.*;
 import lombok.AllArgsConstructor;
 import lombok.Data;
@@ -27,8 +28,6 @@ public class UsuarioRequestDTO {
     @NotNull(message = "El ID de la sucursal es obligatorio")
     private Long sucursalId;
 
-    @NotNull(message = "El ID del rol es obligatorio")
-    private Long rolId;
-
+    @NotNull(message = "El nombre del rol es obligatorio")
+    private RolNombre rolNombre;
 }
-

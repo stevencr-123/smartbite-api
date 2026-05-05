@@ -1,0 +1,25 @@
+package com.smartbite.administrativo.dto;
+
+import lombok.AllArgsConstructor;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+import java.time.LocalDateTime;
+
+@Data
+@NoArgsConstructor
+@AllArgsConstructor
+public class ItemInventarioResponseDTO {
+    private Long id;
+    private String nombre;
+    private String descripcion;
+    private Integer stockActual;
+    private Integer stockMinimo;
+    private String unidadMedida;
+    private Double costoUnitario;
+    private String ubicacion;
+    private Boolean activo;
+    private LocalDateTime fechaCreacion;
+    private LocalDateTime fechaActualizacion;
+    private Long sucursalId;
+    private String sucursalNombre;
+}
