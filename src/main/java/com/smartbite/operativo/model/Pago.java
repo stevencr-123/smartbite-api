@@ -1,5 +1,6 @@
 package com.smartbite.operativo.model;
 
+import com.fasterxml.jackson.annotation.JsonBackReference;
 import com.smartbite.operativo.model.enums.EstadoPago;
 import jakarta.persistence.*;
 import lombok.*;
@@ -16,11 +17,12 @@ import java.time.LocalDateTime;
 @Table(name = "pagos", indexes = {
         @Index(name = "idx_pago_orden", columnList = "orden_id")
 })
-
+@EqualsAndHashCode(onlyExplicitlyIncluded = true)
 public class Pago {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @EqualsAndHashCode.Include
     private Long id;
 
     @Column(nullable = false, precision = 10, scale = 2)
@@ -36,15 +38,12 @@ public class Pago {
     @Column(name = "referencia_transaccion", length = 100)
     private String referenciaTransaccion;
 
-    // --- Internal JPA relationships (Operativo module) ---
-
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "orden_id", nullable = false)
+    @JsonBackReference // 🔥 SOLUCIONA LOOP
     private Orden orden;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "metodo_pago_id", nullable = false)
     private MetodoPago metodoPago;
-
-
 }

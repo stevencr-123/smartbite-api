@@ -13,10 +13,16 @@ import java.time.LocalDateTime;
 public class CodigoQRResponseDTO {
 
     private Long id;
+
     private String contenido;
     private TipoQR tipo;
+
     private Boolean activo;
     private LocalDateTime fechaGeneracion;
+
     private Long mesaId;
+    private Integer numeroMesa;
+
     private Long productoId;
+    private String nombreProducto;
 }

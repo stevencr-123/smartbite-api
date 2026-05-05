@@ -12,8 +12,9 @@ import java.math.BigDecimal;
 public class MetodoPagoResponseDTO {
 
     private Long id;
+
     private String nombre;
     private Boolean activo;
+
     private BigDecimal comision;
 }
-

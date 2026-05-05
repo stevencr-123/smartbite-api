@@ -15,5 +15,6 @@ public interface PagoService {
     BigDecimal calcularTotalPagado(Long ordenId);
 
     boolean estaOrdenTotalmentePagada(Long ordenId);
-}
 
+    PagoResponseDTO obtenerPagoPorId(Long pagoId);
+}

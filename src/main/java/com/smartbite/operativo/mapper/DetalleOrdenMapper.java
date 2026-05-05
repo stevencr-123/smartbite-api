@@ -9,6 +9,7 @@ import org.mapstruct.Mapping;
 @Mapper(componentModel = "spring")
 public interface DetalleOrdenMapper {
 
+    // nombreProducto se llena desde ProductoClient (Feign)
     @Mapping(target = "nombreProducto", ignore = true)
     DetalleOrdenResponseDTO toResponseDTO(DetalleOrden detalleOrden);
 

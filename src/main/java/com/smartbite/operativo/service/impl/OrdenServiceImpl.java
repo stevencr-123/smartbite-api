@@ -1,17 +1,17 @@
 package com.smartbite.operativo.service.impl;
+
+import com.smartbite.administrativo.dto.SucursalResponseDTO;
+import com.smartbite.administrativo.dto.UsuarioResponseDTO;
 import com.smartbite.operativo.client.ProductoClient;
+import com.smartbite.operativo.client.SucursalClient;
+import com.smartbite.operativo.client.UsuarioClient;
 import com.smartbite.operativo.client.dto.ProductoDTO;
 import com.smartbite.operativo.dto.detalle.AgregarProductoRequestDTO;
 import com.smartbite.operativo.dto.detalle.DetalleOrdenResponseDTO;
 import com.smartbite.operativo.dto.orden.CrearOrdenRequestDTO;
 import com.smartbite.operativo.dto.orden.OrdenResumenDTO;
 import com.smartbite.operativo.dto.orden.OrdenResponseDTO;
-import com.smartbite.operativo.exception.BusinessException;
-import com.smartbite.operativo.exception.EstadoOrdenInvalidoException;
-import com.smartbite.operativo.exception.InvalidStateException;
-import com.smartbite.operativo.exception.MesaNotFoundException;
-import com.smartbite.operativo.exception.OrdenNoPagadaException;
-import com.smartbite.operativo.exception.OrdenNotFoundException;
+import com.smartbite.operativo.exception.*;
 import com.smartbite.operativo.mapper.DetalleOrdenMapper;
 import com.smartbite.operativo.mapper.OrdenMapper;
 import com.smartbite.operativo.model.DetalleOrden;
@@ -45,13 +45,21 @@ public class OrdenServiceImpl implements OrdenService {
     private final PagoService pagoService;
     private final OrdenMapper ordenMapper;
     private final DetalleOrdenMapper detalleOrdenMapper;
+    private final UsuarioClient usuarioClient;
+    private final SucursalClient sucursalClient;
 
     @Override
     @Transactional
     public OrdenResponseDTO crearOrden(CrearOrdenRequestDTO request) {
+        validarUsuarioYSucursal(request.getUsuarioId(), request.getSucursalId());
+
         Mesa mesa = mesaRepository.findById(request.getMesaId())
                 .orElseThrow(() -> new MesaNotFoundException(
                         "Mesa no encontrada con id: " + request.getMesaId()));
+
+        if (!Objects.equals(mesa.getSucursalId(), request.getSucursalId())) {
+            throw new InvalidStateException("La mesa no pertenece a la sucursal indicada");
+        }
 
         Orden orden = Orden.builder()
                 .fechaCreacion(LocalDateTime.now())
@@ -62,21 +70,16 @@ public class OrdenServiceImpl implements OrdenService {
                 .usuarioId(request.getUsuarioId())
                 .build();
 
-        // Add initial products with snapshot pricing.
+        // ✅ Agregar productos iniciales correctamente
         if (request.getProductos() != null && !request.getProductos().isEmpty()) {
             for (AgregarProductoRequestDTO producto : request.getProductos()) {
                 DetalleOrden detalle = crearDetalleConPrecioSnapshot(orden, producto);
-                orden.getDetalles().add(detalle);
+                orden.addDetalle(detalle); // 🔥 CORREGIDO
             }
         }
 
-        BigDecimal total = orden.getDetalles()
-                .stream()
-                .map(detalle -> Objects.requireNonNullElse(detalle.getSubtotal(), BigDecimal.ZERO))
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
-        orden.setTotal(total);
+        recalcularTotalInterno(orden);
 
-        // Mark table as occupied
         mesa.setEstado(EstadoMesa.OCUPADA);
         mesaRepository.save(mesa);
 
@@ -98,16 +101,15 @@ public class OrdenServiceImpl implements OrdenService {
 
         DetalleOrden detalle = crearDetalleConPrecioSnapshot(orden, request);
 
-        // Keep entity graph consistent
-        orden.getDetalles().add(detalle);
+        orden.addDetalle(detalle); // 🔥 CORREGIDO
 
-        DetalleOrden detalleGuardado = detalleOrdenRepository.save(detalle);
-        BigDecimal nuevoTotal = orden.getDetalles().stream()
-                .map(item -> Objects.requireNonNullElse(item.getSubtotal(), BigDecimal.ZERO))
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
-        orden.setTotal(nuevoTotal);
+        detalleOrdenRepository.save(detalle);
+
+        recalcularTotalInterno(orden);
+
         ordenRepository.save(orden);
-        return detalleOrdenMapper.toResponseDTO(detalleGuardado);
+
+        return detalleOrdenMapper.toResponseDTO(detalle);
     }
 
     @Override
@@ -142,14 +144,9 @@ public class OrdenServiceImpl implements OrdenService {
                 .orElseThrow(() -> new OrdenNotFoundException(
                         "Orden no encontrada con id: " + ordenId));
 
-        BigDecimal nuevoTotal = orden.getDetalles()
-                .stream()
-                .map(detalle -> Objects.requireNonNullElse(detalle.getSubtotal(), BigDecimal.ZERO))
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        recalcularTotalInterno(orden);
 
-        orden.setTotal(nuevoTotal);
-        Orden ordenActualizada = ordenRepository.save(orden);
-        return ordenMapper.toResponseDTO(ordenActualizada);
+        return ordenMapper.toResponseDTO(ordenRepository.save(orden));
     }
 
     @Override
@@ -159,103 +156,116 @@ public class OrdenServiceImpl implements OrdenService {
                 .orElseThrow(() -> new OrdenNotFoundException(
                         "Orden no encontrada con id: " + ordenId));
 
-        EstadoOrden estadoActual = orden.getEstado();
-        if (!esTransicionValida(estadoActual, nuevoEstado)) {
+        if (!esTransicionValida(orden.getEstado(), nuevoEstado)) {
             throw new EstadoOrdenInvalidoException(
-                    "Transición de estado inválida: " + estadoActual + " -> " + nuevoEstado);
+                    "Transición inválida: " + orden.getEstado() + " -> " + nuevoEstado);
         }
 
         if (nuevoEstado == EstadoOrden.PAGADA && !pagoService.estaOrdenTotalmentePagada(ordenId)) {
             throw new OrdenNoPagadaException(
-                    "No se puede marcar como PAGADA una orden que no está totalmente pagada");
+                    "La orden no está totalmente pagada");
         }
 
         orden.setEstado(nuevoEstado);
-        Orden ordenActualizada = ordenRepository.save(orden);
-        return ordenMapper.toResponseDTO(ordenActualizada);
+        return ordenMapper.toResponseDTO(ordenRepository.save(orden));
     }
 
     @Override
     @Transactional
     public OrdenResponseDTO cerrarOrden(Long ordenId) {
-        // Delegate to the same transition validation + payment validation
         OrdenResponseDTO ordenCerrada = cambiarEstado(ordenId, EstadoOrden.PAGADA);
 
-        // Release the table (defensive)
         Orden orden = ordenRepository.findById(ordenId)
                 .orElseThrow(() -> new OrdenNotFoundException(
                         "Orden no encontrada con id: " + ordenId));
 
-        Mesa mesa = orden.getMesa();
-        if (mesa != null) {
-            mesa.setEstado(EstadoMesa.DISPONIBLE);
-            mesaRepository.save(mesa);
+        if (orden.getMesa() != null) {
+            orden.getMesa().setEstado(EstadoMesa.DISPONIBLE);
+            mesaRepository.save(orden.getMesa());
         }
 
         return ordenCerrada;
     }
 
+    // ================= PRIVADOS =================
+
+    private void recalcularTotalInterno(Orden orden) {
+        BigDecimal total = orden.getDetalles()
+                .stream()
+                .map(d -> Objects.requireNonNullElse(d.getSubtotal(), BigDecimal.ZERO))
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+        orden.setTotal(total);
+    }
+
     private boolean esTransicionValida(EstadoOrden actual, EstadoOrden nuevo) {
-        if (actual == null || nuevo == null) {
-            return false;
-        }
+        if (actual == null || nuevo == null) return false;
 
         return switch (actual) {
             case PENDIENTE -> nuevo == EstadoOrden.EN_PREPARACION;
             case EN_PREPARACION -> nuevo == EstadoOrden.LISTA;
             case LISTA -> nuevo == EstadoOrden.ENTREGADA;
             case ENTREGADA -> nuevo == EstadoOrden.PAGADA;
-            case PAGADA, CANCELADA -> false;
+            default -> false;
         };
     }
 
     private DetalleOrden crearDetalleConPrecioSnapshot(Orden orden, AgregarProductoRequestDTO request) {
         if (request.getProductoId() == null) {
-            throw new InvalidStateException("El productoId es obligatorio");
+            throw new InvalidStateException("productoId obligatorio");
         }
+
         if (request.getCantidad() == null || request.getCantidad() <= 0) {
-            throw new InvalidStateException("La cantidad debe ser mayor a 0");
+            throw new InvalidStateException("cantidad debe ser > 0");
         }
 
-        BigDecimal precioUnitario = obtenerPrecioProducto(request.getProductoId());
-        if (precioUnitario.compareTo(BigDecimal.ZERO) <= 0) {
-            throw new InvalidStateException("El precioUnitario debe ser mayor a 0");
-        }
+        BigDecimal precio = obtenerPrecioProducto(request.getProductoId());
 
-        BigDecimal subtotal = precioUnitario.multiply(BigDecimal.valueOf(request.getCantidad()));
+        BigDecimal subtotal = precio.multiply(BigDecimal.valueOf(request.getCantidad()));
 
         return DetalleOrden.builder()
                 .productoId(request.getProductoId())
                 .cantidad(request.getCantidad())
-                .precioUnitario(precioUnitario)
+                .precioUnitario(precio)
                 .subtotal(subtotal)
                 .orden(orden)
                 .build();
     }
 
     private BigDecimal obtenerPrecioProducto(Long productoId) {
-        ProductoDTO producto;
         try {
-            producto = productoClient.obtenerProductoPorId(productoId);
-        } catch (Exception ex) {
-            throw new BusinessException("No se pudo obtener el producto desde Administrativo");
-        }
+            ProductoDTO producto = productoClient.obtenerProductoPorId(productoId);
 
-        if (producto == null) {
-            throw new InvalidStateException("Producto no encontrado con id: " + productoId);
-        }
-        if (producto.getActivo() == null || !producto.getActivo()) {
-            throw new InvalidStateException("El producto no está activo con id: " + productoId);
-        }
+            if (producto == null) {
+                throw new ResourceNotFoundException("Producto no encontrado con id: " + productoId);
+            }
 
-        BigDecimal precio = producto.getPrecio();
-        if (precio == null || precio.compareTo(BigDecimal.ZERO) <= 0) {
-            throw new InvalidStateException("Precio inválido para el producto id: " + productoId);
-        }
+            if (Boolean.FALSE.equals(producto.getActivo())) {
+                throw new InvalidStateException("Producto inactivo");
+            }
 
-        return precio;
+            if (producto.getPrecio() == null || producto.getPrecio().compareTo(BigDecimal.ZERO) <= 0) {
+                throw new InvalidStateException("Precio inválido");
+            }
+
+            return producto.getPrecio();
+
+        } catch (feign.FeignException.NotFound e) {
+            throw new ResourceNotFoundException("Producto no encontrado con id: " + productoId);
+        } catch (feign.FeignException e) {
+            throw new BusinessException("Error con servicio administrativo");
+        }
     }
 
+    private void validarUsuarioYSucursal(Long usuarioId, Long sucursalId) {
+        UsuarioResponseDTO usuario = usuarioClient.obtenerUsuarioPorId(usuarioId);
+        if (usuario == null || Boolean.FALSE.equals(usuario.getActivo())) {
+            throw new InvalidStateException("Usuario inválido");
+        }
 
+        SucursalResponseDTO sucursal = sucursalClient.obtenerSucursalPorId(sucursalId);
+        if (sucursal == null || Boolean.FALSE.equals(sucursal.getActivo())) {
+            throw new InvalidStateException("Sucursal inválida");
+        }
+    }
 }
-

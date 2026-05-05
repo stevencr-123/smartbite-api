@@ -1,7 +1,7 @@
 package com.smartbite.operativo.model;
 
+import com.fasterxml.jackson.annotation.JsonManagedReference;
 import com.smartbite.operativo.model.enums.EstadoOrden;
-import com.smartbite.operativo.model.Venta;
 import jakarta.persistence.*;
 import lombok.*;
 
@@ -17,10 +17,12 @@ import java.util.List;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
+@EqualsAndHashCode(onlyExplicitlyIncluded = true)
 public class Orden {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @EqualsAndHashCode.Include
     private Long id;
 
     @Column(name = "fecha_creacion", nullable = false)
@@ -34,30 +36,32 @@ public class Orden {
     @Builder.Default
     private BigDecimal total = BigDecimal.ZERO;
 
-    // --- Internal JPA relationships (Operativo module) ---
-
-    @ManyToOne(fetch = FetchType.LAZY)
+    // 🔥 RELACIÓN CRÍTICA → EAGER
+    @ManyToOne(fetch = FetchType.EAGER)
     @JoinColumn(name = "mesa_id", nullable = false)
     private Mesa mesa;
 
-    @OneToMany(mappedBy = "orden", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
+    @OneToMany(mappedBy = "orden", cascade = CascadeType.ALL, orphanRemoval = true)
     @Builder.Default
+    @JsonManagedReference
     private List<DetalleOrden> detalles = new ArrayList<>();
 
-    @OneToMany(mappedBy = "orden", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
+    @OneToMany(mappedBy = "orden", cascade = CascadeType.ALL, orphanRemoval = true)
     @Builder.Default
+    @JsonManagedReference
     private List<Pago> pagos = new ArrayList<>();
 
-    @OneToOne(mappedBy = "orden")
-    private Venta venta;
-
-    // --- Cross-module references (Administrativo) ---
+    // ❌ OPCIONAL: eliminar si no se usa
+    // @OneToOne(mappedBy = "orden")
+    // private Venta venta;
 
     @Column(name = "sucursal_id", nullable = false)
     private Long sucursalId;
 
     @Column(name = "usuario_id", nullable = false)
     private Long usuarioId;
+
+    // ================= HELPERS =================
 
     public void addDetalle(DetalleOrden detalle) {
         detalles.add(detalle);

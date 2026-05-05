@@ -10,8 +10,12 @@ import org.mapstruct.Mapping;
 public interface OrdenMapper {
 
     @Mapping(source = "mesa.id", target = "mesaId")
+    @Mapping(source = "mesa.numero", target = "numeroMesa")
+    // nombreUsuario viene de Feign → se llena en service
+    @Mapping(target = "nombreUsuario", ignore = true)
     OrdenResponseDTO toResponseDTO(Orden orden);
 
     @Mapping(source = "mesa.id", target = "mesaId")
+    @Mapping(source = "mesa.numero", target = "numeroMesa")
     OrdenResumenDTO toResumenDTO(Orden orden);
 }

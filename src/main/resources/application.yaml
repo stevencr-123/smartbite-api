@@ -27,7 +27,11 @@ server:
 logging:
   level:
     org.hibernate.SQL: debug
+    # Feign / integración externa (ajustar según entorno)
+    com.smartbite.operativo.client: debug
+    feign: debug
 
 admin:
   service:
+    # TODO: ajustar por entorno (dev/stage/prod)
     url: http://localhost:8081

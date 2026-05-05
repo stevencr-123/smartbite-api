@@ -17,5 +17,7 @@ public class OrdenResumenDTO {
     private LocalDateTime fechaCreacion;
     private EstadoOrden estado;
     private BigDecimal total;
+
     private Long mesaId;
+    private Integer numeroMesa;
 }

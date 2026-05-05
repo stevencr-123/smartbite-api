@@ -44,21 +44,17 @@ public class CodigoQRServiceImpl implements CodigoQRService {
             Mesa mesa = mesaRepository.findById(request.getMesaId())
                     .orElseThrow(() -> new ResourceNotFoundException("Mesa no encontrada con id: " + request.getMesaId()));
             codigoQR.setMesa(mesa);
-            codigoQR.setProductoId(null);
-            codigoQR.setOrdenId(null);
         }
 
         if (request.getTipo() == TipoQR.PRODUCTO) {
-            codigoQR.setMesa(null);
-            codigoQR.setOrdenId(null);
+            codigoQR.setProductoId(request.getProductoId());
         }
 
         if (request.getTipo() == TipoQR.PAGO) {
             if (!ordenRepository.existsById(ordenId)) {
                 throw new ResourceNotFoundException("Orden no encontrada con id: " + ordenId);
             }
-            codigoQR.setMesa(null);
-            codigoQR.setProductoId(null);
+            codigoQR.setOrdenId(ordenId);
         }
 
         CodigoQR codigoQRGuardado = codigoQRRepository.save(codigoQR);
@@ -74,38 +70,42 @@ public class CodigoQRServiceImpl implements CodigoQRService {
     }
 
     private void validarConsistencia(GenerarQRRequestDTO request, Long ordenId) {
+
         if (request == null || request.getTipo() == null) {
             throw new BusinessException("El tipo de QR es obligatorio");
         }
 
-        int referencias = 0;
-        if (request.getMesaId() != null) {
-            referencias++;
-        }
-        if (request.getProductoId() != null) {
-            referencias++;
-        }
-        if (ordenId != null) {
-            referencias++;
-        }
+        TipoQR tipo = request.getTipo();
 
-        if (referencias != 1) {
-            throw new BusinessException("Debe existir una sola referencia para el QR");
-        }
+        switch (tipo) {
 
-        if (request.getTipo() == TipoQR.MESA && request.getMesaId() == null) {
-            throw new BusinessException("Para tipo MESA se requiere mesaId");
-        }
+            case MESA -> {
+                if (request.getMesaId() == null) {
+                    throw new BusinessException("mesaId es obligatorio para QR tipo MESA");
+                }
+                if (request.getProductoId() != null || ordenId != null) {
+                    throw new BusinessException("QR tipo MESA solo debe tener mesaId");
+                }
+            }
 
-        if (request.getTipo() == TipoQR.PRODUCTO && request.getProductoId() == null) {
-            throw new BusinessException("Para tipo PRODUCTO se requiere productoId");
-        }
+            case PRODUCTO -> {
+                if (request.getProductoId() == null) {
+                    throw new BusinessException("productoId es obligatorio para QR tipo PRODUCTO");
+                }
+                if (request.getMesaId() != null || ordenId != null) {
+                    throw new BusinessException("QR tipo PRODUCTO solo debe tener productoId");
+                }
+            }
 
-        if (request.getTipo() == TipoQR.PAGO && ordenId == null) {
-            throw new BusinessException("Para tipo PAGO se requiere ordenId");
+            case PAGO -> {
+                if (ordenId == null) {
+                    throw new BusinessException("ordenId es obligatorio para QR tipo PAGO");
+                }
+                if (request.getMesaId() != null || request.getProductoId() != null) {
+                    throw new BusinessException("QR tipo PAGO solo debe tener ordenId");
+                }
+            }
         }
-
-        // The single-reference guard above already prevents mixed references.
     }
 
     private String generarContenido(TipoQR tipo) {

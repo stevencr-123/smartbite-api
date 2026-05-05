@@ -14,12 +14,15 @@ import java.time.LocalDateTime;
 public class PagoResponseDTO {
 
     private Long id;
+
     private BigDecimal monto;
     private LocalDateTime fechaPago;
     private EstadoPago estado;
+
     private String referenciaTransaccion;
+
     private Long ordenId;
+
     private Long metodoPagoId;
     private String metodoPagoNombre;
 }
-

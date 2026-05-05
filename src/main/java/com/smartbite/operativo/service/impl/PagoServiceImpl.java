@@ -2,18 +2,12 @@ package com.smartbite.operativo.service.impl;
 
 import com.smartbite.operativo.dto.pago.CrearPagoRequestDTO;
 import com.smartbite.operativo.dto.pago.PagoResponseDTO;
-import com.smartbite.operativo.exception.BusinessException;
-import com.smartbite.operativo.exception.OrdenNotFoundException;
-import com.smartbite.operativo.exception.ResourceNotFoundException;
+import com.smartbite.operativo.exception.*;
 import com.smartbite.operativo.mapper.PagoMapper;
-import com.smartbite.operativo.model.MetodoPago;
-import com.smartbite.operativo.model.Orden;
-import com.smartbite.operativo.model.Pago;
+import com.smartbite.operativo.model.*;
 import com.smartbite.operativo.model.enums.EstadoOrden;
 import com.smartbite.operativo.model.enums.EstadoPago;
-import com.smartbite.operativo.repository.MetodoPagoRepository;
-import com.smartbite.operativo.repository.OrdenRepository;
-import com.smartbite.operativo.repository.PagoRepository;
+import com.smartbite.operativo.repository.*;
 import com.smartbite.operativo.service.PagoService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -39,67 +33,58 @@ public class PagoServiceImpl implements PagoService {
     public PagoResponseDTO registrarPago(CrearPagoRequestDTO request) {
 
         if (request.getOrdenId() == null) {
-            throw new BusinessException("ordenId es obligatorio");
+            throw new BusinessException("ordenId obligatorio");
         }
 
         Orden orden = ordenRepository.findById(request.getOrdenId())
-                .orElseThrow(() -> new OrdenNotFoundException(
-                        "Orden no encontrada con id: " + request.getOrdenId()));
+                .orElseThrow(() -> new OrdenNotFoundException("Orden no encontrada"));
 
         if (orden.getEstado() == EstadoOrden.CANCELADA) {
-            throw new BusinessException(
-                    "No se puede registrar un pago para una orden cancelada");
+            throw new BusinessException("Orden cancelada");
         }
 
-        // 🔹 Fuente única de verdad (NO usar estado directamente)
         if (estaOrdenTotalmentePagada(request.getOrdenId())) {
-            throw new BusinessException(
-                    "La orden ya está totalmente pagada");
+            throw new BusinessException("Orden ya pagada");
         }
 
         if (request.getMonto() == null || request.getMonto().compareTo(BigDecimal.ZERO) <= 0) {
-            throw new BusinessException("El monto del pago debe ser mayor a 0");
+            throw new BusinessException("Monto inválido");
         }
 
         BigDecimal totalPagado = calcularTotalPagado(request.getOrdenId());
-        BigDecimal totalOrden = orden.getTotal() == null ? BigDecimal.ZERO : orden.getTotal();
-        BigDecimal saldoPendiente = totalOrden.subtract(totalPagado);
+        BigDecimal saldo = orden.getTotal().subtract(totalPagado);
 
-        if (request.getMonto().compareTo(saldoPendiente) > 0) {
-            throw new BusinessException(
-                    "El monto del pago excede el saldo pendiente de la orden");
+        if (request.getMonto().compareTo(saldo) > 0) {
+            throw new BusinessException("Monto excede saldo");
         }
 
-        MetodoPago metodoPago = metodoPagoRepository.findById(request.getMetodoPagoId())
-                .orElseThrow(() -> new ResourceNotFoundException(
-                        "Método de pago no encontrado con id: " + request.getMetodoPagoId()));
+        MetodoPago metodo = metodoPagoRepository.findById(request.getMetodoPagoId())
+                .orElseThrow(() -> new ResourceNotFoundException("Método de pago no encontrado"));
 
         Pago pago = Pago.builder()
                 .monto(request.getMonto())
                 .fechaPago(LocalDateTime.now())
                 .estado(EstadoPago.APROBADO)
-                .referenciaTransaccion(request.getReferenciaTransaccion())
                 .orden(orden)
-                .metodoPago(metodoPago)
+                .metodoPago(metodo)
+                .referenciaTransaccion(request.getReferenciaTransaccion())
                 .build();
 
-        Pago pagoGuardado = pagoRepository.save(pago);
+        Pago guardado = pagoRepository.save(pago);
 
-        BigDecimal totalPagadoActualizado = totalPagado.add(request.getMonto());
-
-        if (totalPagadoActualizado.compareTo(totalOrden) == 0) {
+        if (totalPagado.add(request.getMonto()).compareTo(orden.getTotal()) == 0) {
             orden.setEstado(EstadoOrden.PAGADA);
             ordenRepository.save(orden);
         }
 
-        return pagoMapper.toResponseDTO(pagoGuardado);
+        return pagoMapper.toResponseDTO(guardado);
     }
 
     @Override
     @Transactional(readOnly = true)
     public List<PagoResponseDTO> obtenerPagosPorOrden(Long ordenId) {
         if (!ordenRepository.existsById(ordenId)) {
-            throw new OrdenNotFoundException("Orden no encontrada con id: " + ordenId);
+            throw new OrdenNotFoundException("Orden no encontrada");
         }
 
         return pagoRepository.findByOrdenId(ordenId)
@@ -111,13 +96,9 @@ public class PagoServiceImpl implements PagoService {
     @Override
     @Transactional(readOnly = true)
     public BigDecimal calcularTotalPagado(Long ordenId) {
-        if (!ordenRepository.existsById(ordenId)) {
-            throw new OrdenNotFoundException("Orden no encontrada con id: " + ordenId);
-        }
-
         return pagoRepository.findByOrdenIdAndEstado(ordenId, EstadoPago.APROBADO)
                 .stream()
-                .map(pago -> Objects.requireNonNullElse(pago.getMonto(), BigDecimal.ZERO))
+                .map(p -> Objects.requireNonNullElse(p.getMonto(), BigDecimal.ZERO))
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
     }
 
@@ -125,12 +106,17 @@ public class PagoServiceImpl implements PagoService {
     @Transactional(readOnly = true)
     public boolean estaOrdenTotalmentePagada(Long ordenId) {
         Orden orden = ordenRepository.findById(ordenId)
-                .orElseThrow(() -> new OrdenNotFoundException(
-                        "Orden no encontrada con id: " + ordenId));
+                .orElseThrow(() -> new OrdenNotFoundException("Orden no encontrada"));
 
-        BigDecimal totalOrden = orden.getTotal() == null ? BigDecimal.ZERO : orden.getTotal();
-        BigDecimal totalPagado = calcularTotalPagado(ordenId);
+        return calcularTotalPagado(ordenId).compareTo(orden.getTotal()) == 0;
+    }
 
-        return totalPagado.compareTo(totalOrden) == 0;
+    @Override
+    @Transactional(readOnly = true)
+    public PagoResponseDTO obtenerPagoPorId(Long pagoId) {
+        Pago pago = pagoRepository.findById(pagoId)
+                .orElseThrow(() -> new PagoNotFoundException("Pago no encontrado"));
+
+        return pagoMapper.toResponseDTO(pago);
     }
 }

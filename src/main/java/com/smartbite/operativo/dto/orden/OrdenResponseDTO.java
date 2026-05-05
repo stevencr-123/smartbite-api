@@ -7,6 +7,7 @@ import lombok.*;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
 
 @Getter
@@ -20,10 +21,18 @@ public class OrdenResponseDTO {
     private LocalDateTime fechaCreacion;
     private EstadoOrden estado;
     private BigDecimal total;
-    private Long mesaId;
-    private Long usuarioId;
-    private Long sucursalId;
-    private List<DetalleOrdenResponseDTO> detalles;
-    private List<PagoResponseDTO> pagos;
-}
 
+    private Long mesaId;
+    private Integer numeroMesa; // 🔥 agregado
+
+    private Long usuarioId;
+    private String nombreUsuario; // 🔥 agregado (útil para UI)
+
+    private Long sucursalId;
+
+    @Builder.Default
+    private List<DetalleOrdenResponseDTO> detalles = new ArrayList<>();
+
+    @Builder.Default
+    private List<PagoResponseDTO> pagos = new ArrayList<>();
+}

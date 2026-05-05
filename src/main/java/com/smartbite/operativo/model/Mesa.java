@@ -16,10 +16,12 @@ import lombok.*;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
+@EqualsAndHashCode(onlyExplicitlyIncluded = true)
 public class Mesa {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @EqualsAndHashCode.Include
     private Long id;
 
     @Column(nullable = false)
@@ -36,7 +38,6 @@ public class Mesa {
     @Builder.Default
     private Boolean activa = true;
 
-    // Cross-module reference — Sucursal belongs to Administrativo
     @Column(name = "sucursal_id", nullable = false)
     private Long sucursalId;
 }
