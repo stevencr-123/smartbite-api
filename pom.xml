@@ -73,13 +73,12 @@
 			<artifactId>spring-boot-starter-web</artifactId>
 		</dependency>
 
-<<<<<<< HEAD
+
         <dependency>
             <groupId>org.springframework.cloud</groupId>
             <artifactId>spring-cloud-starter-openfeign</artifactId>
         </dependency>
-=======
-		<!-- JWT -->
+
 		<dependency>
 			<groupId>io.jsonwebtoken</groupId>
 			<artifactId>jjwt-api</artifactId>
@@ -97,7 +96,6 @@
 			<version>0.11.5</version>
 			<scope>runtime</scope>
 		</dependency>
->>>>>>> 964c4733090fc527d95ba600559226fe6fcd04cf
 
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
