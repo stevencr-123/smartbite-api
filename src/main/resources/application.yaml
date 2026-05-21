@@ -29,6 +29,10 @@ logging:
     org.hibernate.SQL: debug
 
 
+jwt:
+  secret: c21hcnRiaXRlLXN1cGVyLXNlY3JldC1rZXktcGFyYS1qd3QtaHMyNTYtc2VndXJv
+  expiration: 86400000
+
 admin:
   service:
     url: http://localhost:8081
