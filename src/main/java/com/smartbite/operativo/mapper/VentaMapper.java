@@ -9,6 +9,7 @@ import org.mapstruct.Mapping;
 public interface VentaMapper {
 
     @Mapping(source = "orden.id", target = "ordenId")
+    @Mapping(source = "orden.sucursalId", target = "sucursalId")
+    @Mapping(source = "orden.usuarioId", target = "usuarioId")
     VentaResponseDTO toResponseDTO(Venta venta);
 }
-

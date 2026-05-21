@@ -21,13 +21,13 @@ public class ProductoController {
     private final ProductoService productoService;
 
     // ==================== TODOS LOS ROLES AUTENTICADOS ====================
-    @PreAuthorize("isAuthenticated()")
+    // @PreAuthorize("isAuthenticated()")
     @GetMapping
     public ResponseEntity<List<ProductoResponseDTO>> obtenerTodos() {
         return ResponseEntity.ok(productoService.obtenerTodosLosProductos());
     }
 
-    @PreAuthorize("isAuthenticated()")
+    // @PreAuthorize("isAuthenticated()")
     @GetMapping("/{id}")
     public ResponseEntity<ProductoResponseDTO> obtenerPorId(@PathVariable Long id) {
         return ResponseEntity.ok(productoService.obtenerProductoPorId(id));

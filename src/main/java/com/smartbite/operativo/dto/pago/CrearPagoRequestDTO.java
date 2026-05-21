@@ -3,6 +3,7 @@ package com.smartbite.operativo.dto.pago;
 import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Positive;
+import jakarta.validation.constraints.Size;
 import lombok.*;
 
 import java.math.BigDecimal;
@@ -25,5 +26,6 @@ public class CrearPagoRequestDTO {
     @DecimalMin("0.01")
     private BigDecimal monto;
 
+    @Size(max = 255)
     private String referenciaTransaccion;
 }

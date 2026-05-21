@@ -13,6 +13,7 @@ public class GenerarQRRequestDTO {
 
     @NotNull
     private TipoQR tipo;
+
     private Long mesaId;
     private Long productoId;
 }

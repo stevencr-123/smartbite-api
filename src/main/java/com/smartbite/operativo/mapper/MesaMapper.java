@@ -9,4 +9,3 @@ public interface MesaMapper {
 
     MesaResponseDTO toResponseDTO(Mesa mesa);
 }
-
