@@ -2,6 +2,7 @@ package com.smartbite.administrativo.service.impl;
 
 import com.smartbite.administrativo.dto.RolRequestDTO;
 import com.smartbite.administrativo.dto.RolResponseDTO;
+import com.smartbite.administrativo.enums.RolNombre;
 import com.smartbite.administrativo.exception.BusinessException;
 import com.smartbite.administrativo.exception.ResourceNotFoundException;
 import com.smartbite.administrativo.mapper.RolMapper;
@@ -38,11 +39,6 @@ public class RolServiceImpl implements RolService {
         }
 
         Rol rol = rolMapper.toEntity(requestDTO);
-
-        if (requestDTO.getPermisosIds() != null && !requestDTO.getPermisosIds().isEmpty()) {
-            asignarPermisosARol(rol, requestDTO.getPermisosIds());
-        }
-
         Rol guardado = rolRepository.save(rol);
         log.info("Rol creado exitosamente con ID: {}", guardado.getId());
 
@@ -61,12 +57,6 @@ public class RolServiceImpl implements RolService {
         }
 
         rolMapper.updateEntityFromRequest(requestDTO, rol);
-
-        if (requestDTO.getPermisosIds() != null) {
-            rol.getPermisos().clear();
-            asignarPermisosARol(rol, requestDTO.getPermisosIds());
-        }
-
         Rol actualizado = rolRepository.save(rol);
         log.info("Rol actualizado exitosamente");
 
@@ -77,10 +67,8 @@ public class RolServiceImpl implements RolService {
     @Transactional(readOnly = true)
     public RolResponseDTO obtenerRolPorId(Long id) {
         log.debug("Buscando rol con ID: {}", id);
-
         Rol rol = rolRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Rol no encontrado con ID: " + id));
-
         return rolMapper.toResponseDTO(rol);
     }
 
@@ -88,7 +76,6 @@ public class RolServiceImpl implements RolService {
     @Transactional(readOnly = true)
     public List<RolResponseDTO> obtenerTodosLosRoles() {
         log.debug("Obteniendo todos los roles");
-
         return rolRepository.findAll().stream()
                 .map(rolMapper::toResponseDTO)
                 .collect(Collectors.toList());
@@ -97,11 +84,9 @@ public class RolServiceImpl implements RolService {
     @Override
     public void eliminarRol(Long id) {
         log.info("Eliminando rol con ID: {}", id);
-
         if (!rolRepository.existsById(id)) {
             throw new ResourceNotFoundException("Rol no encontrado con ID: " + id);
         }
-
         rolRepository.deleteById(id);
         log.info("Rol eliminado exitosamente");
     }
@@ -109,50 +94,35 @@ public class RolServiceImpl implements RolService {
     @Override
     public RolResponseDTO activarDesactivarRol(Long id, Boolean activo) {
         log.info("Cambiando estado del rol {} a activo={}", id, activo);
-
         Rol rol = rolRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Rol no encontrado con ID: " + id));
-
         rol.setActivo(activo);
-        Rol actualizado = rolRepository.save(rol);
-
-        return rolMapper.toResponseDTO(actualizado);
+        return rolMapper.toResponseDTO(rolRepository.save(rol));
     }
 
     @Override
     public RolResponseDTO asignarPermisos(Long rolId, List<Long> permisosIds) {
         log.info("Asignando permisos al rol ID: {}", rolId);
-
         Rol rol = rolRepository.findById(rolId)
                 .orElseThrow(() -> new ResourceNotFoundException("Rol no encontrado con ID: " + rolId));
-
         asignarPermisosARol(rol, permisosIds);
-        Rol actualizado = rolRepository.save(rol);
-
-        return rolMapper.toResponseDTO(actualizado);
+        return rolMapper.toResponseDTO(rolRepository.save(rol));
     }
 
     @Override
     public RolResponseDTO quitarPermiso(Long rolId, Long permisoId) {
         log.info("Quitando permiso {} del rol {}", permisoId, rolId);
-
         Rol rol = rolRepository.findById(rolId)
                 .orElseThrow(() -> new ResourceNotFoundException("Rol no encontrado con ID: " + rolId));
-
-
-        rol.getPermisos().removeIf(permiso -> permiso.getId().equals(permisoId));
-        Rol actualizado = rolRepository.save(rol);
-
-        return rolMapper.toResponseDTO(actualizado);
+        rol.getPermisos().removeIf(p -> p.getId().equals(permisoId));
+        return rolMapper.toResponseDTO(rolRepository.save(rol));
     }
 
     private void asignarPermisosARol(Rol rol, List<Long> permisosIds) {
         List<Permiso> permisos = permisoRepository.findAllById(permisosIds);
-
         if (permisos.size() != permisosIds.size()) {
             throw new BusinessException("Algunos permisos no existen");
         }
-
         rol.setPermisos(new HashSet<>(permisos));
     }
 }
