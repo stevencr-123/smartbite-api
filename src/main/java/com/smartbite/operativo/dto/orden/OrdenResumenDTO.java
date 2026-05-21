@@ -14,10 +14,18 @@ import java.time.LocalDateTime;
 public class OrdenResumenDTO {
 
     private Long id;
+
     private LocalDateTime fechaCreacion;
+
     private EstadoOrden estado;
+
     private BigDecimal total;
 
     private Long mesaId;
+
     private Integer numeroMesa;
+
+    private Long clienteId;
+
+    private String nombreCliente;
 }

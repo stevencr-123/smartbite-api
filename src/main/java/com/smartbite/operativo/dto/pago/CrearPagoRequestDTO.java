@@ -26,6 +26,6 @@ public class CrearPagoRequestDTO {
     @DecimalMin("0.01")
     private BigDecimal monto;
 
-    @Size(max = 100)
+    @Size(max = 255)
     private String referenciaTransaccion;
 }

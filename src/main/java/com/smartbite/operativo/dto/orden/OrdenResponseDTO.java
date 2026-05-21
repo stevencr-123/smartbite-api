@@ -21,7 +21,8 @@ public class OrdenResponseDTO {
     private LocalDateTime fechaCreacion;
     private EstadoOrden estado;
     private BigDecimal total;
-
+    private Long clienteId;
+    private String nombreCliente;
     private Long mesaId;
     private Integer numeroMesa; // 🔥 agregado
 

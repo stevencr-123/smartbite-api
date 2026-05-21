@@ -9,14 +9,13 @@ spring:
     driver-class-name: org.postgresql.Driver
 
   jpa:
+    open-in-view: false
     hibernate:
       ddl-auto: update
     show-sql: true
     properties:
       hibernate:
-        dialect: org.hibernate.dialect.PostgreSQLDialect
         format_sql: true
-
   sql:
     init:
       mode: never
@@ -27,3 +26,16 @@ server:
 logging:
   level:
     org.hibernate.SQL: debug
+
+jwt:
+  secret: c21hcnRiaXRlLXN1cGVyLXNlY3JldC1rZXktcGFyYS1qd3QtaHMyNTYtc2VndXJv
+  expiration: 86400000
+
+admin:
+  service:
+    url: http://localhost:8080
+
+stripe:
+  secret-key: ${STRIPE_SECRET_KEY}
+  public-key: ${STRIPE_PUBLIC_KEY}
+  webhook-secret: ${STRIPE_WEBHOOK_SECRET}

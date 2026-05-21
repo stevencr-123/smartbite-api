@@ -23,6 +23,8 @@ public class CrearOrdenRequestDTO {
     @NotNull
     private Long sucursalId;
 
+    private Long clienteId;
+
     @NotEmpty
     private List<AgregarProductoRequestDTO> productos;
 }
