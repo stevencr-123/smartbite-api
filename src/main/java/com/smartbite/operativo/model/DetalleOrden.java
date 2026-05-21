@@ -1,5 +1,6 @@
 package com.smartbite.operativo.model;
 
+import com.fasterxml.jackson.annotation.JsonBackReference;
 import jakarta.persistence.*;
 import lombok.*;
 
@@ -12,10 +13,12 @@ import java.math.BigDecimal;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
+@EqualsAndHashCode(onlyExplicitlyIncluded = true)
 public class DetalleOrden {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @EqualsAndHashCode.Include
     private Long id;
 
     @Column(nullable = false)
@@ -27,13 +30,10 @@ public class DetalleOrden {
     @Column(nullable = false, precision = 10, scale = 2)
     private BigDecimal subtotal;
 
-    // --- Internal JPA relationship (Operativo module) ---
-
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "orden_id", nullable = false)
+    @JsonBackReference // 🔥 EVITA RECURSIÓN
     private Orden orden;
-
-    // --- Cross-module reference (Administrativo) ---
 
     @Column(name = "producto_id", nullable = false)
     private Long productoId;

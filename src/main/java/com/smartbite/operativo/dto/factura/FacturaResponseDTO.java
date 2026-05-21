@@ -13,12 +13,16 @@ import java.time.LocalDateTime;
 public class FacturaResponseDTO {
 
     private Long id;
+
     private String numero;
     private LocalDateTime fechaEmision;
+
     private BigDecimal subtotal;
     private BigDecimal impuestos;
     private BigDecimal total;
+
     private Long ventaId;
     private Long clienteId;
-}
 
+    private String nombreCliente;
+}

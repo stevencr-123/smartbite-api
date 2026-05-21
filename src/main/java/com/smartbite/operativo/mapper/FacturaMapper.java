@@ -10,6 +10,6 @@ public interface FacturaMapper {
 
     @Mapping(source = "venta.id", target = "ventaId")
     @Mapping(source = "cliente.id", target = "clienteId")
+    @Mapping(source = "cliente.nombre", target = "nombreCliente")
     FacturaResponseDTO toResponseDTO(Factura factura);
 }
-

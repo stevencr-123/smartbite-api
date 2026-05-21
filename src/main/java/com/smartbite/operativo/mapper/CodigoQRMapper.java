@@ -10,6 +10,9 @@ import org.mapstruct.Mapping;
 public interface CodigoQRMapper {
 
     @Mapping(source = "mesa.id", target = "mesaId")
+    @Mapping(source = "mesa.numero", target = "numeroMesa")
+    // nombreProducto se llena desde service (Feign)
+    @Mapping(target = "nombreProducto", ignore = true)
     CodigoQRResponseDTO toResponseDTO(CodigoQR codigoQR);
 
     @Mapping(target = "id", ignore = true)

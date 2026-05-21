@@ -13,8 +13,12 @@ import java.time.LocalDateTime;
 public class VentaResponseDTO {
 
     private Long id;
+
     private LocalDateTime fechaVenta;
     private BigDecimal total;
-    private Long ordenId;
-}
 
+    private Long ordenId;
+
+    private Long sucursalId;
+    private Long usuarioId;
+}
