@@ -6,10 +6,7 @@
         <groupId>org.springframework.boot</groupId>
         <artifactId>spring-boot-starter-parent</artifactId>
         <version>3.2.5</version>
-        <dependency>
-            <groupId>org.springframework.cloud</groupId>
-            <artifactId>spring-cloud-starter-openfeign</artifactId>
-        </dependency>
+        
         <relativePath/>
     </parent>
 	<groupId>com.smartbite</groupId>
@@ -76,13 +73,19 @@
 			<artifactId>spring-boot-starter-web</artifactId>
 		</dependency>
 
-<<<<<<< HEAD
+
         <dependency>
             <groupId>org.springframework.cloud</groupId>
             <artifactId>spring-cloud-starter-openfeign</artifactId>
         </dependency>
-=======
-		<!-- JWT -->
+
+
+		<dependency>
+			<groupId>com.itextpdf</groupId>
+			<artifactId>itextpdf</artifactId>
+			<version>5.5.13.4</version>
+		</dependency>
+
 		<dependency>
 			<groupId>io.jsonwebtoken</groupId>
 			<artifactId>jjwt-api</artifactId>
@@ -100,7 +103,6 @@
 			<version>0.11.5</version>
 			<scope>runtime</scope>
 		</dependency>
->>>>>>> 964c4733090fc527d95ba600559226fe6fcd04cf
 
 		<dependency>
 			<groupId>org.springframework.boot</groupId>

@@ -22,5 +22,6 @@ public interface MovimientoInventarioMapper {
 
     @Mapping(target = "itemInventarioId", source = "itemInventario.id")
     @Mapping(target = "itemInventarioNombre", source = "itemInventario.nombre")
+    @Mapping(target = "itemInventarioUnidadMedida", source = "itemInventario.unidadMedida")
     MovimientoInventarioResponseDTO toResponseDTO(MovimientoInventario movimiento);
 }

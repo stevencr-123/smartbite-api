@@ -39,9 +39,5 @@ public class AuthController {
         }
     }
 
-    // ⚠️ SOLO PARA DESARROLLO — eliminar antes de producción
-    @GetMapping("/hash")
-    public ResponseEntity<String> generarHash(@RequestParam String password) {
-        return ResponseEntity.ok(passwordEncoder.encode(password));
-    }
+
 }

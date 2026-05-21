@@ -12,7 +12,7 @@ import java.util.HashMap;
 import java.util.Map;
 
 @RestControllerAdvice
-public class GlobalExceptionHandler extends RuntimeException{
+public class AdministrativoGlobalExceptionHandler extends RuntimeException{
 
     // 404 - Recurso no encontrado
     @ExceptionHandler(ResourceNotFoundException.class)
