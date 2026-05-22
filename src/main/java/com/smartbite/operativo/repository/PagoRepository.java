@@ -2,7 +2,11 @@ package com.smartbite.operativo.repository;
 
 import com.smartbite.operativo.model.Pago;
 import com.smartbite.operativo.model.enums.EstadoPago;
+import jakarta.persistence.LockModeType;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
@@ -66,4 +70,8 @@ public interface PagoRepository extends JpaRepository<Pago, Long> {
     boolean existsBySessionId(
             String sessionId
     );
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("select p from Pago p where p.id = :id")
+    Optional<Pago> findByIdForUpdate(@Param("id") Long id);
 }
