@@ -4,5 +4,6 @@ public enum RolNombre {
     ADMINISTRADOR,
     JEFE_INVENTARIO,
     JEFE_COCINA,
-    MESERO
+    MESERO,
+    CAJERO
 }

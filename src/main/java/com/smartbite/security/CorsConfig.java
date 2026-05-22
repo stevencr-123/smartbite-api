@@ -1,4 +1,4 @@
-package com.smartbite.config;
+package com.smartbite.security;
 
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
